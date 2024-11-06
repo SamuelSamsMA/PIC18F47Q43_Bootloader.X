@@ -1,4 +1,5 @@
 .generated_files/
+.ca/
 build/
 dist/
 nbproject/Makefile-*

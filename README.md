@@ -45,62 +45,76 @@ Esta aplicación ha sido probada con el siguiente software y hardware:
 + Data size: **8**
 + Stop bits: **1**
 
-## Configuración del MCC para otros proyectos
+## Configuración para otros proyectos
 
-Todos los proyectos que utilicen este bootloader como base deberán configurar
-los siguientes puntos tal cual en el MCC:
+A continuación se muestran los pasos a seguir para configurar un nuevo proyecto que ocupe como base este bootloader:
 
-+ Clock Settings
+1. Crear un nuevo proyecto de MPLABX.
+
+2. Abrir el MCC Melody.
+
+3. Configuración del reloj:
     + Clock Source: **HFINTOSC**
     + HF Internal Clock: **64_MHz**
     + Clock Divider: **1**
 
-+ CONFIG1
-    + External Oscillator Selection: **Oscillator not enabled**
-    + Reset Oscillator Selection: **HFINTOSC with HFFRQ = 64 MHz and CDIV = 1:1**
+4. Bits de configuración:
+    + CONFIG1
+        + External Oscillator Selection: **Oscillator not enabled**
+        + Reset Oscillator Selection: **HFINTOSC with HFFRQ = 64 MHz and CDIV = 1:1**
+    + CONFIG3
+        + Multi-vector enable bit: **Interrupt contoller does not use vector table to prioritze interrupts**
+        + MCLR Enable bit: **If LVP = 0, MCLR pin is MCLR; If LVP = 1, RE3 pin function is MCLR**
+        + Brown-out Reset Enable bits: **Brown-out Reset enabled , SBOREN bit is ignored**
+        + Power-up timer selection bits: **PWRT set at 16ms**
+        + IVTLOCK bit One-way set enable bit: **IVTLOCKED bit can be cleared and set only once**
+        + Low Power BOR Enable bit: **Low-Power BOR disabled**
+    + El resto de bits se dejan con su valor por defecto.
 
-+ CONFIG2
-    + Clock out Enable bit: **CLKOUT function is disabled**
-    + Fail-Safe Clock Monitor Enable bit: **Fail-Safe Clock Monitor enabled**
-    + Clock Switch Enable bit: **Writing to NOSC and NDIV is allowed**
-    + PRLOCKED One-Way Set Enable bit: **PRLOCKED bit can be cleared and set only once**
+5. Configurar el resto de periféricos de acuerdo a la aplicación en particular.
 
-+ CONFIG3
-    + Multi-vector enable bit: **Interrupt contoller does not use vector table to prioritze interrupts**
-    + MCLR Enable bit: **If LVP = 0, MCLR pin is MCLR; If LVP = 1, RE3 pin function is MCLR**
-    + Brown-out Reset Enable bits: **Brown-out Reset enabled , SBOREN bit is ignored**
-    + Power-up timer selection bits: **PWRT set at 16ms**
-    + IVTLOCK bit One-way set enable bit: **IVTLOCKED bit can be cleared and set only once**
-    + Low Power BOR Enable bit: **Low-Power BOR disabled**
+6. Generar el código del MCC.
 
-+ CONFIG4
-    + Extended Instruction Set Enable bit: **Extended Instruction Set and Indexed Addressing Mode disabled**
-    + Low Voltage Programming Enable bit: **Low voltage programming enabled. MCLR/VPP pin function is MCLR. MCLRE configuration bit is ignored**
-    + ZCD Disable bit: **ZCD module is disabled. ZCD can be enabled by setting the ZCDSEN bit of ZCDCON**
-    + Stack Full/Underflow Reset Enable bit: **Stack full/underflow will cause Reset**
-    + Brown-out Reset Voltage Selection bits: **Brown-out Reset Voltage (VBOR) set to 1.9V**
-    + PPSLOCK bit One-Way Set Enable bit: **PPSLOCKED bit can be cleared and set only once; PPS registers remain locked after one clear/set cycle**
+7. Pegar el siguiente código en el archivo **main.c** antes de la función `main`:
+```c
+#include <stdint.h> 
+#ifdef __XC8__ 
+#include <xc.h> 
+#endif 
+volatile const uint16_t 
+#ifdef __XC8__ 
+__at(0x1FFFE) 
+#endif 
+applicationFooter __attribute__((used, section("application_footer"))) = 0xFFFF;
+```
 
-+ CONFIG5
-    + WDT Period selection bits: **Divider ratio 1:65536; software control of WDTPS**
-    + WDT operating mode: **WDT Disabled; SWDTEN is ignored**
+8. Ir a *Propiedades del proyecto* y elegir el páquete y compilador correspondiente.
 
-+ CONFIG6
-    + WDT Window Select bits: **window always open (100%); software control; keyed access not required**
-    + WDT input clock selector: **Software Control**
+9. *XC8 Linker -> Aditional options*
+    + Codeoffset = **2000h**
+    + Checksum = **2000-1FFFD@1FFFE,width=-2,algorithm=2**
 
-+ CONFIG7
-    + Storage Area Flash enable bit: **SAF disabled**
-    + Boot Block enable bit: **Boot block disabled**
-    + Boot Block Size selection bits: **Boot Block size is 512 words**
+10. *XC8 Linker -> Fill Flash Memory*
+    + Which area to fill: **Provide Range to fill**
+    + How to fill it: **Provide sequence of values**
+    + Sequence: **0xFFFF**
+    + Memory address range: **0x2000:0x1FFFF**
 
-+ CONFIG8
-    + Boot Block Write Protection bit: **Boot Block not Write protected**
-    + Configuration Register Write Protection bit: **Configuration registers not Write protected**
-    + Data EEPROM Write Protection bit: **Data EEPROM not Write protected**
-    + Application Block write protection bit: **Application Block not write protected**
-    + SAF Write protection bit: **SAF not Write Protected**
+11. *Building*
+    + ☑ Execute this line after build:
+    + `pyfwimagebuilder build -i ./dist/default/production/NOMBRE_DEL_PROYECTO.X.production.hex -c bootloader_configuration.toml -o output.img`
+    + (Este comando se ejecutará automáticamente después de cada compilación y combinará los archivos *.hex* y *.toml* para generar la imagen que se cargará al PIC).
 
-+ CONFIG10
-    + PFM and Data EEPROM Code Protection bit: **PFM and Data EEPROM code protection disabled**
+12. Copiar el archivo **bootloader_configuration.toml** generado en este proyecto al directorio del nuevo proyecto.
+    + La ruta de ese archivo es **mcc_generated_files\bootloader\configurations\\**
 
+13. Escribir el código de la aplicación.
+
+14. Compilar el proyecto.
+
+15. Entrar al modo boot en el PIC (RESET -> BOOT_BUTTON).
+
+16. Cargar el archivo de imagen **output.img** en el PIC mediante la herramienta **pymdfu** en la términal.
+    + `pymdfu update --tool serial --image output.img --baudrate 9600 --port COM3`
+
+17. Si todo salió bien, el PIC saldrá del modo boot una vez que la aplicación se halla escrito y comprobado correctamente.
